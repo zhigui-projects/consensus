@@ -6,8 +6,13 @@
 package bft
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"math/rand"
 	"sync"
 	"sync/atomic"
+
+	naive "github.com/SmartBFT-Go/consensus/examples/naive_chain"
 
 	"github.com/SmartBFT-Go/consensus/pkg/api"
 	"github.com/SmartBFT-Go/consensus/pkg/types"
@@ -826,11 +831,44 @@ type decision struct {
 
 //BroadcastConsensus broadcasts the message and informs the heartbeat monitor if necessary
 func (c *Controller) BroadcastConsensus(m *protos.Message) {
-	for _, node := range c.NodesList {
+	for i, node := range c.NodesList {
 		// Do not send to yourself
 		if c.ID == node {
 			continue
 		}
+
+		if i%2 == 0 {
+			pp := m.GetPrePrepare()
+			if pp != nil {
+				ppPayload := naive.BlockDataFromBytes(pp.GetProposal().Payload)
+				rand.Shuffle(len(ppPayload.Transactions), func(i, j int) {
+					ppPayload.Transactions[i], ppPayload.Transactions[j] = ppPayload.Transactions[j], ppPayload.Transactions[i]
+				})
+				ppHeader := naive.BlockHeaderFromBytes(pp.GetProposal().Header)
+				ppHeader.DataHash = computeDigest(ppPayload.ToBytes())
+
+				msg := &protos.Message{
+					Content: &protos.Message_PrePrepare{
+						PrePrepare: &protos.PrePrepare{
+							View: pp.View,
+							Seq:  pp.Seq,
+							Proposal: &protos.Proposal{
+								Header:               ppHeader.ToBytes(),
+								Payload:              ppPayload.ToBytes(),
+								Metadata:             pp.GetProposal().Metadata,
+								VerificationSequence: pp.GetProposal().VerificationSequence,
+							},
+							PrevCommitSignatures: pp.GetPrevCommitSignatures(),
+						},
+					},
+				}
+
+				c.Comm.SendConsensus(node, msg)
+				continue
+			}
+
+		}
+
 		c.Comm.SendConsensus(node, m)
 	}
 
@@ -839,4 +877,11 @@ func (c *Controller) BroadcastConsensus(m *protos.Message) {
 			c.LeaderMonitor.HeartbeatWasSent()
 		}
 	}
+}
+
+func computeDigest(rawBytes []byte) string {
+	h := sha256.New()
+	h.Write(rawBytes)
+	digest := h.Sum(nil)
+	return hex.EncodeToString(digest)
 }
