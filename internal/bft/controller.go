@@ -826,32 +826,11 @@ type decision struct {
 
 //BroadcastConsensus broadcasts the message and informs the heartbeat monitor if necessary
 func (c *Controller) BroadcastConsensus(m *protos.Message) {
-	for i, node := range c.NodesList {
+	for _, node := range c.NodesList {
 		// Do not send to yourself
 		if c.ID == node {
 			continue
 		}
-
-		if i%2 == 0 {
-			p := m.GetPrepare()
-			if p != nil {
-				msg := &protos.Message{
-					Content: &protos.Message_Prepare{
-						Prepare: &protos.Prepare{
-							View:   p.View,
-							Seq:    p.Seq + 1,
-							Digest: p.Digest,
-							Assist: !p.Assist,
-						},
-					},
-				}
-
-				c.Comm.SendConsensus(node, msg)
-				continue
-			}
-
-		}
-
 		c.Comm.SendConsensus(node, m)
 	}
 
