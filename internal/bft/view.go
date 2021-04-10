@@ -375,7 +375,7 @@ func (v *View) processProposal() Phase {
 	if err := v.State.Save(savedMsg); err != nil {
 		v.Logger.Panicf("Failed to save message to state, error: %v", err)
 	}
-	//v.lastBroadcastSent = prepareMessage
+	v.lastBroadcastSent = prepareMessage
 	v.currPrepareSent = proto.Clone(prepareMessage).(*protos.Message)
 	v.currPrepareSent.GetPrepare().Assist = true
 	v.inFlightProposal = &proposal
@@ -473,7 +473,7 @@ func (v *View) processPrepares() Phase {
 	}
 	v.currCommitSent = proto.Clone(commitMsg).(*protos.Message)
 	v.currCommitSent.GetCommit().Assist = true
-	//v.lastBroadcastSent = commitMsg
+	v.lastBroadcastSent = commitMsg
 
 	v.Logger.Infof("Processed prepares for proposal with seq %d", seq)
 	return PREPARED
